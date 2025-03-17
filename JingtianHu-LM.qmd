@@ -1,0 +1,29 @@
+---
+title: "Wellspring Data Analysis Project Proposal"
+author: "Jingtian Hu - (Instructors: Nathalie Moon and Morris Greenberg)"
+format: pdf
+editor: visual
+---
+
+```{r}
+library(tidyverse)
+library(clock)
+data <- read_csv("wrangled_Member_Backgournd.csv")
+```
+
+```{r}
+added_dates_data <- data |>
+     mutate(
+         starting_date = date_build(member_start_year, member_start_month, ),
+         ending_date = date_build(2025, 2, 1)
+     )
+
+added_membership_duration <- added_dates_data |>
+  mutate(mem_duration_month = (ending_date - starting_date) |> as.numeric() / 30)
+final_data <- added_membership_duration |> mutate(present_service_deliveries_per_month = number_of_present_service_deliveries / mem_duration_month)
+```
+
+```{r}
+model <- lm(mem_duration_month ~ age_years * gender * mailing_city * i_identify_as_lgbtq * i_identify_as_poc * types_of_cancer * program_interest * how_have_you_heard_of_wellspring, data=final_data)
+
+```

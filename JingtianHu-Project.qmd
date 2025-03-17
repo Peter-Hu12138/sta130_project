@@ -1,0 +1,185 @@
+---
+title: "Your Project Title (be descriptive and creative!)"
+subtitle: "You can either put a subtitle here or delete this line"
+author: "Team members' full names, tutorial groups, and group number"
+format:
+  revealjs:
+    theme: simple
+    slide-number: true
+    fontsize: 3.5em
+    width: 1600
+    height: 900
+    margin: 0.1
+    pdf-max-pages-per-slide: 1
+    self-contained: true
+editor: visual
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = FALSE,      # Hide code
+  include = FALSE,   # Do not include output
+  warning = FALSE,   # Suppress warnings
+  message = FALSE,   # Suppress messages
+  results = "hide"   # Hide printed output
+)
+
+# Note: the options above are to hide the code chunk in the slides and to not include the code in the slides
+# There are many other options you can use to customize which parts of the code are run / displayed, 
+# as well as how the output is displayed. 
+# You can learn more at https://quarto.org/docs/computations/execution-options.html
+
+```
+
+```{r load-data}
+
+# setup
+library(tidyverse)
+
+# Load data we need to load the data, but don't want to display it in our slides
+# The code chunk options at in the curly brackets above specif
+data_patient_members <- read_csv("Member_Background.csv")
+data_attendance_records <- read_csv("Service_Deliveries.csv")
+
+
+## Parse members data
+## Types of cancer - convert to set of indicator variables for different types of cancer (don't include ones which are too rare)
+data_patient_members <- data_patient_members |>
+   mutate(lung = str_detect(types_of_cancer, "Lung"),
+         breast = str_detect(types_of_cancer, "Breast"),
+         brain = str_detect(types_of_cancer, "Brain"),
+         leukemia = str_detect(types_of_cancer, "Leukemia"),
+         prostate = str_detect(types_of_cancer, "Prostate"),
+         colorectal = str_detect(types_of_cancer, "Colorectal"),
+         pancreatic = str_detect(types_of_cancer, "Pancreatic"),
+         lymphoma_non_hodgkins = str_detect(types_of_cancer, "Lymphoma, Non-hodgkins"),
+         liver = str_detect(types_of_cancer, "Liver"),
+         multiple_myeloma = str_detect(types_of_cancer, "Multiple Myeloma"),
+         bladder = str_detect(types_of_cancer, "Bladder"),
+         cervical = str_detect(types_of_cancer, "Cervical"),
+         esophagus = str_detect(types_of_cancer, "Esophagus"),
+         gallbladder_and_bile_duct = str_detect(types_of_cancer, "Gallbladder and Bile Duct"),
+         head_and_neck = str_detect(types_of_cancer, "Head and Neck"),
+         kidney = str_detect(types_of_cancer, "Kidney"),
+         lymphoma_hodgkins = str_detect(types_of_cancer, "Lymphoma, Hodgkins"),
+         ovarian = str_detect(types_of_cancer, "Ovarian"),
+         skin = str_detect(types_of_cancer, "Skin"),
+         stomach = str_detect(types_of_cancer, "Stomach"),
+         testicular = str_detect(types_of_cancer, "Testicular"),
+         thyroid = str_detect(types_of_cancer, "Thyroid"),
+         cervical = str_detect(types_of_cancer, "Cervical"),
+         other = str_detect(types_of_cancer, "Other"))
+
+
+## Impairments - convert to set of indicator variables for different types of impairment (don't include ones which are too rare)
+data_patient_members <- data_patient_members |>
+  mutate(visual = str_detect(i_have_the_following_impairment, "visual"),
+         cognitive = str_detect(i_have_the_following_impairment, "cognitive"),
+         limited_mobility = str_detect(i_have_the_following_impairment, "mobility"),
+         none_of_the_above = str_detect(i_have_the_following_impairment, "None of the above"),
+         other = str_detect(i_have_the_following_impairment, "other"),
+         speech = str_detect(i_have_the_following_impairment, "speech"),
+         hearing = str_detect(i_have_the_following_impairment, "hearing")) 
+
+## Program interests: Split into boolean indicators for different categories
+data_patient_members <- data_patient_members |>
+  mutate(therapeutic_arts = str_detect(program_interest, "Therapeutic Arts"),
+         educational_and_self_developoment = str_detect(program_interest, "Educational & Self-Development"),
+         symptom_management = str_detect(program_interest, "Symptom Management"),
+         social_events = str_detect(program_interest, "Social / Events"),
+         financiaL_and_workplace_strategies = str_detect(program_interest, "Financial & Workplace Strategies"),
+         exercise_and_movement = str_detect(program_interest, "Exercise & Movement"),
+         individual_and_group_support = str_detect(program_interest, "Individual & Group Support")) |>
+  mutate(num_program_interests = therapeutic_arts + educational_and_self_developoment + symptom_management + social_events + financiaL_and_workplace_strategies + exercise_and_movement + individual_and_group_support)
+
+## How did you hear about wellspring: Split into booleans
+data_patient_members <- data_patient_members |>
+  mutate(word_of_mouth = str_detect(how_have_you_heard_of_wellspring, "Word of mouth"),
+         flyer = str_detect(how_have_you_heard_of_wellspring, "flyer"),
+         wellspring_member = str_detect(how_have_you_heard_of_wellspring, "Member"),
+         wellspring_member = str_detect(how_have_you_heard_of_wellspring, "Volunteer"),
+         doctor = str_detect(how_have_you_heard_of_wellspring, "Doctor"),
+         hospital = str_detect(how_have_you_heard_of_wellspring, "hospital"),
+         hospital = str_detect(how_have_you_heard_of_wellspring, "healthcare"),
+         tv = str_detect(how_have_you_heard_of_wellspring, "television"),
+         website = str_detect(how_have_you_heard_of_wellspring, "Website"),
+         family = str_detect(how_have_you_heard_of_wellspring, "Family"),
+         social_media = str_detect(how_have_you_heard_of_wellspring, "Social Media"),
+         other = str_detect(how_have_you_heard_of_wellspring, "Other"))
+
+```
+
+```{r}
+# dataset dimensions
+data_attendance_records |> 
+  dim()
+
+# What members register for the most events?
+data_attendance_records |> 
+  group_by(member_id) |>
+  summarise(n=n()) |>
+  arrange(desc(n))
+
+# Let's examine information on the member with the highest attendance
+high_attendance <- data_attendance_records |> 
+  filter(member_id == "003ON000007sHYtYAM")
+
+data_patient_members |> filter(member_id == "003ON000007sHYtYAM")
+
+# What is range of registration dates for members in first table
+data_patient_members |> 
+  group_by(member_start_year) |>
+  summarise(n=n()) |>
+  arrange(desc(n))
+```
+
+## A heading that starts on a new page
+
+This document shows a few basics on making slides with R markdown.
+
+To produce the slides, Render this qmd document by clicking at the top of the screen
+
+You will need to submit a qmd and pdf version of your slides.
+
+You must use the same slides in your video presentation and at the in-person poster fair (printed slides)
+
+## Small font size {.smaller}
+
+You can also start a new slide with a header (indicated by two hashtags)
+
+This slide will have smaller font size because of what we specified right after the header
+
+## Mixed font size on a single slide
+
+::: {style="font-size: 0.8em;"}
+This div has a reduced font size through inline styling.
+:::
+
+::: {style="font-size: 4em;"}
+And now it's bigger
+:::
+
+## A slide with a bulleted list
+
+-   Bullet 1
+-   Bullet 2
+
+## A slide with a numbered list
+
+1.  First point
+2.  Second point
+
+# New Section by using a bigger header (one \# sign)
+
+## First slide in new section - multiple columns
+
+::: columns
+::: {.column width="40%"}
+-   Bullet 1 in left
+-   Bullet 2 in left
+:::
+
+::: {.column width="60%"}
+Right column
+:::
+:::

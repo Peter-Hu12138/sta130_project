@@ -1,0 +1,27 @@
+```{r}
+# load library and data set
+library(tidyverse)
+data <- read_csv("Member_Background.csv")
+```
+
+
+```{r}
+# get rid of the time traveller! but we want to keep people with empty last service
+data <- data |> filter(is.na(last_service_date_year) | last_service_date_year < 2025 | last_service_date_month <= 2)
+```
+
+```{r}
+# remove people who had their record last service before their record member start time
+# as usual, keep people with no record
+data <- data |> filter(is.na(last_service_date_year) | member_start_year <= last_service_date_year)
+```
+
+```{r}
+# remove people with negative age
+data |> filter(is.na(age_years) | age_years >= 0)
+```
+
+```{r}
+# export to new data set
+data |> write_csv("wrangled_Member_Backgournd.csv")
+```
