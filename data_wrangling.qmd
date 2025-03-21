@@ -18,10 +18,39 @@ data <- data |> filter(is.na(last_service_date_year) | member_start_year <= last
 
 ```{r}
 # remove people with negative age
-data |> filter(is.na(age_years) | age_years >= 0)
+data <- data |> filter(is.na(age_years) | age_years >= 0)
+```
+
+```{r}
+
+services <- read_csv("Service_Deliveries.csv")
+members_with_record_service <- (services |> group_by(member_id) |> summarise())$member_id
+member_background <- read_csv("wrangled_Member_Backgournd.csv")
+member_background |> filter(is.na(number_of_present_service_deliveries))
+na_present_deliveries <- member_background |> filter(is.na(number_of_present_service_deliveries))
+na_present_deliveries <- member_background |> filter(is.na(number_of_present_service_deliveries))
+na_present_deliveries_people <- na_present_deliveries$member_id
+
+check_alignment <- function() {
+  for(na_person in na_present_deliveries_people){
+    if(na_person %in% members_with_record_service){
+      return(FALSE)
+    }
+  }
+  return(TRUE)
+}
+
+if(check_alignment()){
+  print("all people who have na present delivery are not in service table")
+}
+
+
+data <- data |> replace_na(list(number_of_present_service_deliveries=0))
+
+
 ```
 
 ```{r}
 # export to new data set
-data |> write_csv("wrangled_Member_Backgournd.csv")
+data |> write_csv("v1_wrangled_Member_Background.csv")
 ```
