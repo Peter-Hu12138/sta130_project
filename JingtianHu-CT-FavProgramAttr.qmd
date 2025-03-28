@@ -1,0 +1,227 @@
+---
+title: "Wellspring Data Analysis Project Proposal"
+author: "Jingtian Hu - (Instructors: Nathalie Moon and Morris Greenberg)"
+format: pdf
+editor: visual
+---model <- rpart(activeness ~ age_years + gender + program_interest + mailing_city + parent_of_a_child_under_18 + types_of_cancer + i_have_the_following_impairment + how_have_you_heard_of_wellspring, data=added_frequency_category)
+---
+
+# Research problem: can we predict people's fav program type according to self-reported demographic info?
+
+## Research method, decision tree with rpart
+
+### intepretation and conclusion: the tree is outperforming random guessing and guessing the most frequent option. However, it is still not quite accurate. Moreover, since this classification task has obvious unequal consequences depending on false positives/negatives, I don't inteprete them differently.
+
+```{r}
+library(tidyverse)
+library(clock)
+library(rpart)
+library(partykit)
+setwd("~/sta130_project/")
+
+```
+
+```{r}
+mem_bg_data <- read_csv("v3_wrangled_Member_Background.csv")
+added_dates_data <- mem_bg_data |>
+     mutate(
+         starting_date = date_build(member_start_year, member_start_month, ),
+         ending_date = date_build(2025, 2, 1),
+     )
+
+added_membership_duration <- added_dates_data |>
+  mutate(mem_duration_month = (ending_date - starting_date) |> as.numeric() / 30)
+
+added_attendance_rate <- added_membership_duration |> 
+  filter(number_of_present_service_deliveries + number_of_absent_service_deliveries > 0) |>
+  mutate(attendance_rate = number_of_present_service_deliveries / (number_of_present_service_deliveries + number_of_absent_service_deliveries))
+
+print(median(added_attendance_rate$attendance_rate))
+print(mean(added_attendance_rate$attendance_rate))
+
+added_attendance_category <- added_attendance_rate |>
+  mutate(attendance_rate_category = case_when(
+    attendance_rate <= 0.7 ~ "low",
+    attendance_rate > 0.7 ~ "high",
+  ))
+
+```
+
+```{r}
+service_table <- read_csv("Service_Deliveries.csv") |> filter(attendance_status == "Present")
+table(service_table$service)
+# find too many programs, some categories are too specific
+```
+
+```{r}
+service_table_integrated <- service_table |> mutate(organized_service = sapply(strsplit(service, ":"), `[`, 1))
+service_table_integrated |> group_by(member_id) |> 
+  summarise(fav_program = first(names(sort(table(organized_service), decreasing = TRUE)))) |>
+  group_by(fav_program) |> summarise(n = n())
+# the output is given to ai to generate the mapping in next part
+# to classify programs that are fav_program of some members
+service_table_integrated |> group_by(member_id, organized_service) |> 
+  summarise(n = n())
+```
+
+```{r}
+program_category_mapping_concise <- data.frame(
+  organized_service = c(
+    "Art Therapy", "Art Workshop", "Art Workshops", "Be Well Talks", "Bereavement Support Group - Family",
+    "Bereavement Support Group - Spousal/Partner", "Bladder Cancer Peer Support", "Brain Fog",
+    "Breast Cancer Support Group", "Breathing Wellness", "Cancer Coaching", "Cancer Coaching Volunteer Training",
+    "Cancer Exercise", "Cancer Related Fatigue", "Cancer Transition Coaching", "Caregivers Connect",
+    "Chair Yoga", "Chi Life", "Child Minding", "Children's and Parents' Program",
+    "Dance and Flow Workshop", "Drumming Workshop", "ELLICSR - Healing Journey 1", "ELLICSR - Yoga",
+    "Employment Law & LTD Legal Clinic", "Energy Sessions (Reiki + Healing Touch + Therapeutic Touch)",
+    "Energy Sessions (Reiki)", "Family Counselling", "Family Event", "Family Navigation",
+    "Gay Men's Cancer Support Group", "Gay and Queer Men's Cancer Support Group",
+    "Groupe de soutien - Cancer de l’ovaire", "Groupe de soutien du cancer de l'ovaire", "Healing Journey 1",
+    "Healing Journey 2", "Healing Journey 3", "Healing Journey 5", "Healing Journey 6",
+    "Healing Journey Level 1", "Healing Journey Level 2", "Healing Journey Level 3",
+    "Lesbians and Queer Support Group", "Let's Knit", "Let's Sing", "Living With Chronic Cancer Support Group",
+    "Look Good Feel Better", "Look Good Feel Better (external)", "Lymphoma Support Group", "Meditation",
+    "Meditation Workshop", "Meditation Workshops", "Members' Potluck", "Mindfulness Based Cancer Recovery",
+    "Money Matters", "Money Matters (Ontario)", "Money Matters Professional Consultations", "Music Therapy",
+    "Music Workshop", "Myeloma Peer Support", "Nourish", "OASIS Parents Support Group",
+    "Oasis Advanced Cancer Support Group", "Oasis Art Expression Studio", "Ovarian Cancer Circle",
+    "Ovarian Cancer Peer Support", "Ovarian Cancer Peer Support - French", "Ovarian Cancer Support Group",
+    "Ovarian Cancer Support Group - French", "Pancreatic Cancer Peer Support",
+    "Pancreatic Cancer Short Term Counselling", "Pancreatic Cancer Short-term Professional Counselling",
+    "Pancreatic Cancer Support Group", "Patient Support Circle", "Patient's Connect", "Peer Support",
+    "Peer Support - L'Chaim", "Peer Support - Ovarian Cancer", "Peer Support - Pancreatic Cancer",
+    "Peer Support - Welcome Calls", "Prostate Cancer Support Group (external)",
+    "Prostate Cancer Support Group - Oakville/Mississauga", "Reiki", "Relaxation and Visualization",
+    "Returning to Work", "Short Term Counselling", "Short-term Professional Counselling",
+    "Sound Bath Meditations Workshop", "St. Michael's - Healing Journey 1", "Support Circle",
+    "Support Group", "Volunteer Recognition Event", "Volunteer Support Training",
+    "Volunteer Support Training (Fee For Service)", "Wellness Workshop", "Wellness Workshops",
+    "Wellness at Work", "Wellspring Discussion Forum", "Wellspring Exercise 101", "Wig Program",
+    "Writing Workshop", "Writing Workshops", "Yoga"
+  ),
+  program_category = c(
+    "Creative & Expressive Arts", "Creative & Expressive Arts", "Creative & Expressive Arts",
+    "Wellness Education & Skills", "Peer & Community Support", "Peer & Community Support",
+    "Peer & Community Support", "Peer & Community Support", "Peer & Community Support",
+    "Mind-Body Wellness", "Peer & Community Support", "Wellness Education & Skills",
+    "Mind-Body Wellness", "Peer & Community Support", "Peer & Community Support",
+    "Peer & Community Support", "Mind-Body Wellness", "Creative & Expressive Arts",
+    "Family & Caregiver Resources", "Family & Caregiver Resources", "Creative & Expressive Arts",
+    "Creative & Expressive Arts", "Peer & Community Support", "Mind-Body Wellness",
+    "Wellness Education & Skills", "Mind-Body Wellness", "Mind-Body Wellness",
+    "Family & Caregiver Resources", "Information & Resource Events", "Family & Caregiver Resources",
+    "Peer & Community Support", "Peer & Community Support", "Peer & Community Support",
+    "Peer & Community Support", "Peer & Community Support", "Peer & Community Support",
+    "Peer & Community Support", "Peer & Community Support", "Peer & Community Support",
+    "Peer & Community Support", "Peer & Community Support", "Peer & Community Support",
+    "Peer & Community Support", "Creative & Expressive Arts", "Creative & Expressive Arts",
+    "Peer & Community Support", "Wellness Education & Skills", "Wellness Education & Skills",
+    "Peer & Community Support", "Mind-Body Wellness", "Mind-Body Wellness",
+    "Mind-Body Wellness", "Information & Resource Events", "Mind-Body Wellness",
+    "Wellness Education & Skills", "Wellness Education & Skills", "Wellness Education & Skills",
+    "Creative & Expressive Arts", "Creative & Expressive Arts", "Peer & Community Support",
+    "Peer & Community Support", "Family & Caregiver Resources", "Peer & Community Support",
+    "Creative & Expressive Arts", "Peer & Community Support", "Peer & Community Support",
+    "Peer & Community Support", "Peer & Community Support", "Peer & Community Support",
+    "Peer & Community Support", "Peer & Community Support", "Peer & Community Support",
+    "Peer & Community Support", "Peer & Community Support", "Peer & Community Support",
+    "Peer & Community Support", "Peer & Community Support", "Peer & Community Support",
+    "Peer & Community Support", "Peer & Community Support", "Peer & Community Support",
+    "Peer & Community Support", "Mind-Body Wellness", "Mind-Body Wellness",
+    "Wellness Education & Skills", "Wellness Education & Skills", "Wellness Education & Skills",
+    "Mind-Body Wellness", "Peer & Community Support", "Peer & Community Support",
+    "Peer & Community Support", "Information & Resource Events", "Wellness Education & Skills",
+    "Wellness Education & Skills", "Wellness Education & Skills", "Wellness Education & Skills",
+    "Wellness Education & Skills", "Peer & Community Support", "Wellness Education & Skills",
+    "Information & Resource Events", "Creative & Expressive Arts", "Creative & Expressive Arts",
+    "Mind-Body Wellness"
+  )
+)
+
+
+# Display the corrected and final data frame
+print(program_category_mapping_concise)
+```
+
+```{r}
+service_table_added_category <- service_table_integrated |> inner_join(program_category_mapping_concise)
+summary_table_mem_fav_program <- service_table_added_category |> group_by(member_id) |> 
+  summarise(fav_program_category = first(names(sort(table(program_category), decreasing = TRUE))))
+summary_table_mem_fav_program |> glimpse()
+```
+
+```{r}
+mem_bg_data <- read_csv("v3_wrangled_Member_Background.csv")
+final_data_1 <- mem_bg_data |> right_join(summary_table_mem_fav_program)
+final_data_2 <- mem_bg_data |> inner_join(summary_table_mem_fav_program)
+
+final_data_1 |> anti_join(final_data_2)
+
+final_data <- final_data_2
+final_data <- final_data |> filter(number_of_present_service_deliveries > 0, i_have_the_following_impairment != "Unknown", i_have_the_following_impairment != "None of the above")
+```
+
+```{r}
+# traning on entire dataset
+model <- rpart(fav_program_category ~ gender + age_years + parent_of_a_child_under_18 + i_identify_as_lgbtq + i_identify_as_poc + mailing_state_province, data=final_data_2)
+predictions <- predict(model, newdata=final_data_2, type="class")
+table(predictions, final_data_2$fav_program_category)
+plot(as.party(model), gp=gpar(cex=0.25), type = "simple")
+
+
+n_obs = nrow(final_data_2)
+summ <- final_data_2 |> group_by(fav_program_category) |>
+  summarize(fav_program_category_prop = n()/n_obs)
+
+summ |> ggplot(aes(x=fav_program_category, y=fav_program_category_prop)) + 
+  geom_col() + labs(x="fav program type", y="propotion") + coord_flip()
+
+plot_helper <- final_data_2 |> group_by(gender, fav_program_category) |>
+  summarize(fav_program_category_prop = n()/n_obs)
+plot_helper |> ggplot(aes(gender, fav_program_category_prop, fill = fav_program_category)) + geom_col() +
+  labs(x="gender", y="proportion within all observations") + coord_flip()
+
+plot_helper <- final_data_2 |> filter(gender=="Unknown") |> group_by(mailing_state_province, fav_program_category) |>
+  summarize(fav_program_category_prop = n()/n_obs)
+plot_helper |> ggplot(aes(mailing_state_province, fav_program_category_prop, fill = fav_program_category)) + geom_col() +
+  labs(x="residencial state / province", y="proportion within all observations") + coord_flip()
+
+accuracy_of_guessing_PC_1 <- max(summ$fav_program_category_prop)
+accuracy_of_model_1 <- 2290 / 3643
+accuracy_of_model_1 > accuracy_of_guessing_PC_1
+
+```
+
+```{r}
+# traning on people who are with disabilities
+library(rpart.plot)
+model <- rpart(fav_program_category ~ gender + age_years + parent_of_a_child_under_18 + i_identify_as_lgbtq + i_identify_as_poc + mailing_state_province, data=final_data)
+predictions <- predict(model, newdata=final_data, type="class")
+table(predictions, final_data$fav_program_category)
+
+plot(as.party(model),  gp=gpar(cex=0.4), type="s", main="Decision Tree")
+rpart.plot(model)
+
+n_obs = nrow(final_data)
+summ <- final_data |> group_by(fav_program_category) |>
+  summarize(fav_program_category_prop = n()/n_obs)
+
+summ |> ggplot(aes(x=fav_program_category, y=fav_program_category_prop)) + 
+  geom_col() + labs(x="fav program type", y="propotion") + coord_flip()
+
+plot_helper <- final_data |> group_by(gender, fav_program_category) |>
+  summarize(fav_program_category_prop = n()/n_obs)
+plot_helper |> ggplot(aes(gender, fav_program_category_prop, fill = fav_program_category)) + geom_col() +
+  labs(x="gender", y="proportion within all observations") + coord_flip()
+
+accuracy_of_guessing_PC_2 <- max(summ$fav_program_category_prop)
+accuracy_of_model_2 <- (17 + 42) / n_obs
+accuracy_of_model_2 > accuracy_of_guessing_PC_2
+
+plot_helper <- final_data |> filter(gender=="Unknown") |> group_by(mailing_state_province, fav_program_category) |>
+  summarize(fav_program_category_prop = n()/n_obs)
+plot_helper |> ggplot(aes(mailing_state_province, fav_program_category_prop, fill = fav_program_category)) + geom_col() +
+  labs(x="residencial state / province", y="proportion within all observations") + coord_flip()
+
+
+```

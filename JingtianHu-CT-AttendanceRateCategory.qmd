@@ -1,0 +1,59 @@
+---
+title: "Wellspring Data Analysis Project Proposal"
+author: "Jingtian Hu - (Instructors: Nathalie Moon and Morris Greenberg)"
+format: pdf
+editor: visual
+---model <- rpart(activeness ~ age_years + gender + program_interest + mailing_city + parent_of_a_child_under_18 + types_of_cancer + i_have_the_following_impairment + how_have_you_heard_of_wellspring, data=added_frequency_category)
+---
+
+```{r}
+library(tidyverse)
+library(clock)
+library(rpart)
+library(partykit)
+setwd("~/sta130_project/")
+data <- read_csv("v2_wrangled_Member_Background.csv")
+```
+
+```{r}
+added_dates_data <- data |>
+     mutate(
+         starting_date = date_build(member_start_year, member_start_month, ),
+         ending_date = date_build(2025, 2, 1),
+     )
+
+added_membership_duration <- added_dates_data |>
+  mutate(mem_duration_month = (ending_date - starting_date) |> as.numeric() / 30)
+
+added_attendance_rate <- added_membership_duration |> 
+  filter(number_of_present_service_deliveries + number_of_absent_service_deliveries > 0) |>
+  mutate(attendance_rate = number_of_present_service_deliveries / (number_of_present_service_deliveries + number_of_absent_service_deliveries))
+
+print(median(added_attendance_rate$attendance_rate))
+print(mean(added_attendance_rate$attendance_rate))
+
+added_attendance_category <- added_attendance_rate |>
+  mutate(attendance_rate_category = case_when(
+    attendance_rate <= 0.7 ~ "low",
+    attendance_rate > 0.7 ~ "high",
+  ))
+
+
+exclude_na <- added_attendance_category |> filter(!is.na(i_have_the_following_impairment))
+
+process_na <- added_attendance_category |> replace_na(list(program_interest="Unknown"))
+```
+
+```{r}
+# traning without crossvalidate
+model <- rpart(attendance_rate_category ~ age_years, data=exclude_na)
+predictions <- predict(model, newdata=added_attendance_category, type="class")
+table(predictions, added_attendance_category$attendance_rate_category)
+plot(as.party(model), gp=gpar(cex=0.4), type = "simple")
+```
+
+```{r}
+# traning with crossvalidate
+model <- rpart(present_service_deliveries_per_month ~ (age_years + gender + types_of_cancer), data=final_data)
+
+```

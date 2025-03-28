@@ -1,0 +1,286 @@
+---
+title: "Wellspring Data Analysis Project Proposal"
+author: "Jingtian Hu - (Instructors: Nathalie Moon and Morris Greenberg)"
+format: pdf
+editor: visual
+---model <- rpart(activeness ~ age_years + gender + program_interest + mailing_city + parent_of_a_child_under_18 + types_of_cancer + i_have_the_following_impairment + how_have_you_heard_of_wellspring, data=added_frequency_category)
+---
+
+# Research problem: can we predict people's fav program type according to self-reported demographic info?
+
+## Research method, Classification Decision Tree with rpart
+
+## relevance:
+Wellspring manager can benefit from knowing members' program preferences by
+1. recommending programs to members that they are more likely to be interested in
+2. tailoring particular program types to approach certain groups of members.
+
+## Processing:
+
+1. In service table, I transformed every service's name to exclude the subtitle (anything after ":" if any) so that classifying can be done to fewer session names.
+2. Then, I grouped services by member_id and summarize that which session name was each one's favorite (judging by number of registration not succ attendances).
+  - Intermediate step with GenAI, I used Google Gemini to generate a mapping from session name to program type (I checked the classification, it made sense but might still be of questions).
+3. I used the mapping to map everyone's favorite session's name to a concise category of program.
+4. I join the member background table with the table of favorite program of each member and run R decision tree algorithm.
+
+### Intepretation and conclusion: 
+Since this classification task has no obvious unequal consequences depending on false positives/negatives, I interpret these cases equally. The tree is outperforming random guessing / guessing the most frequent option. However, it is still not quite accurate; this suggests that there are 3 possibilities, 1. the variables I fed are not good indicators of program type favor 2. the model is too simplematic to capture the relationship 3. These demographic variables have a lot of missing values, which make it hard to apply to the population.
+
+### Data expectation:
+1. less missing values
+2. 
+
+```{r}
+library(tidyverse)
+library(clock)
+library(rpart)
+library(partykit)
+setwd("~/sta130_project/")
+
+```
+
+```{r}
+service_table <- read_csv("Service_Deliveries.csv")
+table(service_table$service)
+# find too many programs, some categories are too specific
+```
+```{r}
+data_patient_members <- read_csv("v3_wrangled_Member_Background.csv")
+
+## Parse members data
+## Types of cancer - convert to set of indicator variables for different types of cancer (don't include ones which are too rare)
+data_patient_members <- data_patient_members |>
+   mutate(lung = str_detect(types_of_cancer, "Lung"),
+         breast = str_detect(types_of_cancer, "Breast"),
+         brain = str_detect(types_of_cancer, "Brain"),
+         leukemia = str_detect(types_of_cancer, "Leukemia"),
+         prostate = str_detect(types_of_cancer, "Prostate"),
+         colorectal = str_detect(types_of_cancer, "Colorectal"),
+         pancreatic = str_detect(types_of_cancer, "Pancreatic"),
+         lymphoma_non_hodgkins = str_detect(types_of_cancer, "Lymphoma, Non-hodgkins"),
+         liver = str_detect(types_of_cancer, "Liver"),
+         multiple_myeloma = str_detect(types_of_cancer, "Multiple Myeloma"),
+         bladder = str_detect(types_of_cancer, "Bladder"),
+         cervical = str_detect(types_of_cancer, "Cervical"),
+         esophagus = str_detect(types_of_cancer, "Esophagus"),
+         gallbladder_and_bile_duct = str_detect(types_of_cancer, "Gallbladder and Bile Duct"),
+         head_and_neck = str_detect(types_of_cancer, "Head and Neck"),
+         kidney = str_detect(types_of_cancer, "Kidney"),
+         lymphoma_hodgkins = str_detect(types_of_cancer, "Lymphoma, Hodgkins"),
+         ovarian = str_detect(types_of_cancer, "Ovarian"),
+         skin = str_detect(types_of_cancer, "Skin"),
+         stomach = str_detect(types_of_cancer, "Stomach"),
+         testicular = str_detect(types_of_cancer, "Testicular"),
+         thyroid = str_detect(types_of_cancer, "Thyroid"),
+         cervical = str_detect(types_of_cancer, "Cervical"),
+         other = str_detect(types_of_cancer, "Other"))
+
+
+## Impairments - convert to set of indicator variables for different types of impairment (don't include ones which are too rare)
+data_patient_members <- data_patient_members |>
+  mutate(visual = str_detect(i_have_the_following_impairment, "visual"),
+         cognitive = str_detect(i_have_the_following_impairment, "cognitive"),
+         limited_mobility = str_detect(i_have_the_following_impairment, "mobility"),
+         none_of_the_above = str_detect(i_have_the_following_impairment, "None of the above"),
+         other = str_detect(i_have_the_following_impairment, "other"),
+         speech = str_detect(i_have_the_following_impairment, "speech"),
+         hearing = str_detect(i_have_the_following_impairment, "hearing")) 
+
+## Program interests: Split into boolean indicators for different categories
+data_patient_members <- data_patient_members |>
+  mutate(therapeutic_arts = str_detect(program_interest, "Therapeutic Arts"),
+         educational_and_self_developoment = str_detect(program_interest, "Educational & Self-Development"),
+         symptom_management = str_detect(program_interest, "Symptom Management"),
+         social_events = str_detect(program_interest, "Social / Events"),
+         financiaL_and_workplace_strategies = str_detect(program_interest, "Financial & Workplace Strategies"),
+         exercise_and_movement = str_detect(program_interest, "Exercise & Movement"),
+         individual_and_group_support = str_detect(program_interest, "Individual & Group Support")) |>
+  mutate(num_program_interests = therapeutic_arts + educational_and_self_developoment + symptom_management + social_events + financiaL_and_workplace_strategies + exercise_and_movement + individual_and_group_support)
+
+## How did you hear about wellspring: Split into booleans
+data_patient_members <- data_patient_members |>
+  mutate(word_of_mouth = str_detect(how_have_you_heard_of_wellspring, "Word of mouth"),
+         flyer = str_detect(how_have_you_heard_of_wellspring, "flyer"),
+         wellspring_member = str_detect(how_have_you_heard_of_wellspring, "Member"),
+         wellspring_member = str_detect(how_have_you_heard_of_wellspring, "Volunteer"),
+         doctor = str_detect(how_have_you_heard_of_wellspring, "Doctor"),
+         hospital = str_detect(how_have_you_heard_of_wellspring, "hospital"),
+         hospital = str_detect(how_have_you_heard_of_wellspring, "healthcare"),
+         tv = str_detect(how_have_you_heard_of_wellspring, "television"),
+         website = str_detect(how_have_you_heard_of_wellspring, "Website"),
+         family = str_detect(how_have_you_heard_of_wellspring, "Family"),
+         social_media = str_detect(how_have_you_heard_of_wellspring, "Social Media"),
+         other = str_detect(how_have_you_heard_of_wellspring, "Other"))
+```
+
+```{r}
+service_table_integrated <- service_table |> mutate(organized_service = sapply(strsplit(service, ":"), `[`, 1))
+service_table_integrated |> group_by(member_id) |> 
+  summarise(fav_program = first(names(sort(table(organized_service), decreasing = TRUE)))) |>
+  group_by(fav_program) |> summarise(n = n())
+# the output is given to ai to generate the mapping in next part
+# to classify programs that are fav_program of some members
+service_table_integrated |> group_by(member_id, organized_service) |> 
+  summarise(n = n())
+```
+
+```{r}
+program_category_mapping_concise <- data.frame(
+  organized_service = c(
+    "Art Therapy", "Art Workshop", "Art Workshops", "Be Well Talks", "Bereavement Support Group - Family",
+    "Bereavement Support Group - Spousal/Partner", "Bladder Cancer Peer Support", "Brain Fog",
+    "Breast Cancer Support Group", "Breathing Wellness", "Cancer Coaching", "Cancer Coaching Volunteer Training",
+    "Cancer Exercise", "Cancer Related Fatigue", "Cancer Transition Coaching", "Caregivers Connect",
+    "Chair Yoga", "Chi Life", "Child Minding", "Children's and Parents' Program",
+    "Dance and Flow Workshop", "Drumming Workshop", "ELLICSR - Healing Journey 1", "ELLICSR - Yoga",
+    "Employment Law & LTD Legal Clinic", "Energy Sessions (Reiki + Healing Touch + Therapeutic Touch)",
+    "Energy Sessions (Reiki)", "Family Counselling", "Family Event", "Family Navigation",
+    "Gay Men's Cancer Support Group", "Gay and Queer Men's Cancer Support Group",
+    "Groupe de soutien - Cancer de l’ovaire", "Groupe de soutien du cancer de l'ovaire", "Healing Journey 1",
+    "Healing Journey 2", "Healing Journey 3", "Healing Journey 5", "Healing Journey 6",
+    "Healing Journey Level 1", "Healing Journey Level 2", "Healing Journey Level 3",
+    "Lesbians and Queer Support Group", "Let's Knit", "Let's Sing", "Living With Chronic Cancer Support Group",
+    "Look Good Feel Better", "Look Good Feel Better (external)", "Lymphoma Support Group", "Meditation",
+    "Meditation Workshop", "Meditation Workshops", "Members' Potluck", "Mindfulness Based Cancer Recovery",
+    "Money Matters", "Money Matters (Ontario)", "Money Matters Professional Consultations", "Music Therapy",
+    "Music Workshop", "Myeloma Peer Support", "Nourish", "OASIS Parents Support Group",
+    "Oasis Advanced Cancer Support Group", "Oasis Art Expression Studio", "Ovarian Cancer Circle",
+    "Ovarian Cancer Peer Support", "Ovarian Cancer Peer Support - French", "Ovarian Cancer Support Group",
+    "Ovarian Cancer Support Group - French", "Pancreatic Cancer Peer Support",
+    "Pancreatic Cancer Short Term Counselling", "Pancreatic Cancer Short-term Professional Counselling",
+    "Pancreatic Cancer Support Group", "Patient Support Circle", "Patient's Connect", "Peer Support",
+    "Peer Support - L'Chaim", "Peer Support - Ovarian Cancer", "Peer Support - Pancreatic Cancer",
+    "Peer Support - Welcome Calls", "Prostate Cancer Support Group (external)",
+    "Prostate Cancer Support Group - Oakville/Mississauga", "Reiki", "Relaxation and Visualization",
+    "Returning to Work", "Short Term Counselling", "Short-term Professional Counselling",
+    "Sound Bath Meditations Workshop", "St. Michael's - Healing Journey 1", "Support Circle",
+    "Support Group", "Volunteer Recognition Event", "Volunteer Support Training",
+    "Volunteer Support Training (Fee For Service)", "Wellness Workshop", "Wellness Workshops",
+    "Wellness at Work", "Wellspring Discussion Forum", "Wellspring Exercise 101", "Wig Program",
+    "Writing Workshop", "Writing Workshops", "Yoga"
+  ),
+  program_category = c(
+    "Creative & Expressive Arts", "Creative & Expressive Arts", "Creative & Expressive Arts",
+    "Wellness Education & Skills", "Peer & Community Support", "Peer & Community Support",
+    "Peer & Community Support", "Peer & Community Support", "Peer & Community Support",
+    "Mind-Body Wellness", "Peer & Community Support", "Wellness Education & Skills",
+    "Mind-Body Wellness", "Peer & Community Support", "Peer & Community Support",
+    "Peer & Community Support", "Mind-Body Wellness", "Creative & Expressive Arts",
+    "Family & Caregiver Resources", "Family & Caregiver Resources", "Creative & Expressive Arts",
+    "Creative & Expressive Arts", "Peer & Community Support", "Mind-Body Wellness",
+    "Wellness Education & Skills", "Mind-Body Wellness", "Mind-Body Wellness",
+    "Family & Caregiver Resources", "Information & Resource Events", "Family & Caregiver Resources",
+    "Peer & Community Support", "Peer & Community Support", "Peer & Community Support",
+    "Peer & Community Support", "Peer & Community Support", "Peer & Community Support",
+    "Peer & Community Support", "Peer & Community Support", "Peer & Community Support",
+    "Peer & Community Support", "Peer & Community Support", "Peer & Community Support",
+    "Peer & Community Support", "Creative & Expressive Arts", "Creative & Expressive Arts",
+    "Peer & Community Support", "Wellness Education & Skills", "Wellness Education & Skills",
+    "Peer & Community Support", "Mind-Body Wellness", "Mind-Body Wellness",
+    "Mind-Body Wellness", "Information & Resource Events", "Mind-Body Wellness",
+    "Wellness Education & Skills", "Wellness Education & Skills", "Wellness Education & Skills",
+    "Creative & Expressive Arts", "Creative & Expressive Arts", "Peer & Community Support",
+    "Peer & Community Support", "Family & Caregiver Resources", "Peer & Community Support",
+    "Creative & Expressive Arts", "Peer & Community Support", "Peer & Community Support",
+    "Peer & Community Support", "Peer & Community Support", "Peer & Community Support",
+    "Peer & Community Support", "Peer & Community Support", "Peer & Community Support",
+    "Peer & Community Support", "Peer & Community Support", "Peer & Community Support",
+    "Peer & Community Support", "Peer & Community Support", "Peer & Community Support",
+    "Peer & Community Support", "Peer & Community Support", "Peer & Community Support",
+    "Peer & Community Support", "Mind-Body Wellness", "Mind-Body Wellness",
+    "Wellness Education & Skills", "Wellness Education & Skills", "Wellness Education & Skills",
+    "Mind-Body Wellness", "Peer & Community Support", "Peer & Community Support",
+    "Peer & Community Support", "Information & Resource Events", "Wellness Education & Skills",
+    "Wellness Education & Skills", "Wellness Education & Skills", "Wellness Education & Skills",
+    "Wellness Education & Skills", "Peer & Community Support", "Wellness Education & Skills",
+    "Information & Resource Events", "Creative & Expressive Arts", "Creative & Expressive Arts",
+    "Mind-Body Wellness"
+  )
+)
+
+
+# Display the corrected and final data frame
+print(program_category_mapping_concise)
+```
+
+```{r}
+service_table_added_category <- service_table_integrated |> inner_join(program_category_mapping_concise)
+summary_table_mem_fav_program <- service_table_added_category |> group_by(member_id) |>
+  summarise(fav_program_category = first(names(sort(table(program_category), decreasing = TRUE))))
+summary_table_mem_fav_program |> glimpse()
+```
+
+```{r}
+mem_bg_data <- read_csv("v4_wrangled_Member_Background.csv")
+final_data_1 <- mem_bg_data |> right_join(summary_table_mem_fav_program)
+final_data_2 <- mem_bg_data |> inner_join(summary_table_mem_fav_program)
+
+final_data_1 |> anti_join(final_data_2) # choose final_data_2 since the result of this are no profile members
+
+final_data <- final_data_2 |> dplyr::select(-member_id, -mailing_city, -member_start_year, -member_start_month, -i_have_the_following_impairment, -types_of_cancer, -how_have_you_heard_of_wellspring, -number_of_present_service_deliveries, -number_of_absent_service_deliveries, -last_service_date_year, -last_service_date_month, -last_service_date_day, -program_interest, -hospitals_where_you_were_treated)
+```
+
+```{r}
+# traning on entire dataset
+model <- rpart(fav_program_category ~ , data=final_data)
+predictions <- predict(model, newdata=final_data_2, type="class")
+table(predictions, final_data_2$fav_program_category)
+plot(as.party(model), gp=gpar(cex=0.6), type = "simple")
+
+
+n_obs = nrow(final_data_2)
+summ <- final_data_2 |> group_by(fav_program_category) |>
+  summarize(fav_program_category_prop = n()/n_obs)
+
+summ |> ggplot(aes(x=fav_program_category, y=fav_program_category_prop)) + 
+  geom_col() + labs(x="fav program type", y="propotion") + coord_flip()
+
+plot_helper <- final_data_2 |> group_by(gender, fav_program_category) |>
+  summarize(fav_program_category_prop = n()/n_obs)
+plot_helper |> ggplot(aes(gender, fav_program_category_prop, fill = fav_program_category)) + geom_col() +
+  labs(x="gender", y="proportion within all observations") + coord_flip()
+
+plot_helper <- final_data_2 |> filter(gender=="Unknown") |> group_by(mailing_state_province, fav_program_category) |>
+  summarize(fav_program_category_prop = n()/n_obs)
+plot_helper |> ggplot(aes(mailing_state_province, fav_program_category_prop, fill = fav_program_category)) + geom_col() +
+  labs(x="residencial state / province", y="proportion within all observations") + coord_flip()
+
+accuracy_of_guessing_PC_1 <- max(summ$fav_program_category_prop)
+accuracy_of_model_1 <- 2290 / n_obs
+accuracy_of_model_1 > accuracy_of_guessing_PC_1
+
+```
+
+```{r}
+# traning on people who are with disabilities
+library(rpart.plot)
+model <- rpart(fav_program_category ~ gender + age_years + parent_of_a_child_under_18 + i_identify_as_lgbtq + i_identify_as_poc + mailing_state_province, data=final_data)
+predictions <- predict(model, newdata=final_data, type="class")
+table(predictions, final_data$fav_program_category)
+
+plot(as.party(model),  gp=gpar(cex=0.4), type="s", main="Decision Tree")
+rpart.plot(model)
+
+n_obs = nrow(final_data)
+summ <- final_data |> group_by(fav_program_category) |>
+  summarize(fav_program_category_prop = n()/n_obs)
+
+summ |> ggplot(aes(x=fav_program_category, y=fav_program_category_prop)) + 
+  geom_col() + labs(x="fav program type", y="propotion") + coord_flip()
+
+plot_helper <- final_data |> group_by(gender, fav_program_category) |>
+  summarize(fav_program_category_prop = n()/n_obs)
+plot_helper |> ggplot(aes(gender, fav_program_category_prop, fill = fav_program_category)) + geom_col() +
+  labs(x="gender", y="proportion within all observations") + coord_flip()
+
+accuracy_of_guessing_PC_2 <- max(summ$fav_program_category_prop)
+accuracy_of_model_2 <- (17 + 42) / n_obs
+accuracy_of_model_2 > accuracy_of_guessing_PC_2
+
+plot_helper <- final_data |> filter(gender=="Unknown") |> group_by(mailing_state_province, fav_program_category) |>
+  summarize(fav_program_category_prop = n()/n_obs)
+plot_helper |> ggplot(aes(mailing_state_province, fav_program_category_prop, fill = fav_program_category)) + geom_col() +
+  labs(x="residencial state / province", y="proportion within all observations") + coord_flip()
+
+
+```

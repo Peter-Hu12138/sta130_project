@@ -1,0 +1,57 @@
+---
+title: "Wellspring Data Analysis Project Proposal"
+author: "Jingtian Hu - (Instructors: Nathalie Moon and Morris Greenberg)"
+format: pdf
+editor: visual
+---model <- rpart(activeness ~ age_years + gender + program_interest + mailing_city + parent_of_a_child_under_18 + types_of_cancer + i_have_the_following_impairment + how_have_you_heard_of_wellspring, data=added_frequency_category)
+---
+
+```{r}
+library(tidyverse)
+library(clock)
+library(rpart)
+library(partykit)
+setwd("~/sta130_project/")
+data <- read_csv("v1_wrangled_Member_Background.csv")
+```
+
+```{r}
+added_dates_data <- data |>
+     mutate(
+         starting_date = date_build(member_start_year, member_start_month, ),
+         ending_date = date_build(2025, 2, 1),
+     )
+
+added_membership_duration <- added_dates_data |>
+  mutate(mem_duration_month = (ending_date - starting_date) |> as.numeric() / 30)
+
+added_delivery_frequency <- added_membership_duration |> 
+  mutate(present_service_deliveries_per_month = number_of_present_service_deliveries / mem_duration_month)
+
+print(median(added_delivery_frequency$present_service_deliveries_per_month))
+print(mean(added_delivery_frequency$present_service_deliveries_per_month))
+
+added_frequency_category <- added_delivery_frequency |>
+  mutate(activeness = case_when(
+    present_service_deliveries_per_month <= 0.11 ~ "low",
+    present_service_deliveries_per_month > 0.11 ~ "high",
+  ))
+
+
+exclude_na <- added_frequency_category |> filter(!is.na(i_have_the_following_impairment))
+
+process_na <- added_frequency_category |> replace_na(list(program_interest="Unknown"))
+```
+
+```{r}
+# traning without crossvalidate
+model <- rpart(activeness ~ age_years + i_identify_as_lgbtq + parent_of_a_child_under_18 + i_identify_as_poc + i_have_the_following_impairment + , data=exclude_na)
+predictions <- predict(model, newdata=added_frequency_category, type="class")
+table(predictions, added_frequency_category$activeness)
+```
+
+```{r}
+# traning with crossvalidate
+model <- rpart(present_service_deliveries_per_month ~ (age_years + gender + types_of_cancer), data=final_data)
+
+```

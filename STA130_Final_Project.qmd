@@ -1,0 +1,469 @@
+---
+title: "Analysis of Impact of Wellspring's Registration System Change on Member Engagement & An Attempt for Fitting A Recommendation Model for Programs"
+subtitle: "TUT0204-C"
+author: "Group Members: Jingtian Hu, Mingheng Li, Mingxuan Jinag, Kairui Zhang"
+format:
+  revealjs:
+    theme: simple
+    slide-number: true
+    fontsize: 3.5em
+    width: 1600
+    height: 900
+    margin: 0.1
+    pdf-max-pages-per-slide: 1
+    self-contained: true
+    code: false
+editor: visual
+---
+
+## Inroduction
+
+::: {style="font-size: 0.8em;"}
+1.  This project investigates how Wellspring’s service usage data reflects patterns of member engagement, demographic influences, and the effects of administrative system changes. We selected three research questions that target key aspects of Wellspring's goals: increasing accessibility, promoting early engagement, and improving retention through data-driven strategies.
+
+2.  To explore these, we used descriptive statistics, hypothesis testing, and decision tree. Our methods include a test for equality of medians, a fitted decision tree for predicting favorite program type, and a permutation-based test of proportions for attendance behavior before and after a system update.
+
+3.  Together, these analyses provide insight into the effectiveness of current outreach methods and areas where further optimization can benefit member participation.
+:::
+
+## Data summary for research question 1
+
+::: {style="font-size: 0.8em;"}
+### Wrangling
+
+1.  In service table, I transformed every service's name to exclude the subtitle (anything after ":" if any) so that classifying can be done to fewer session names.
+2.  Then, I grouped services by member_id and summarized which session name was each one's favorite (judging by registration number).
+
+-   In the intermediate step with GenAI, I used Google Gemini to generate a mapping from session name to program type (I checked the classification, it made sense but might still be of questions).
+
+3.  I used the mapping to map everyone's favorite session's name to a concise category of the program.
+4.  I join the member background table with the table of favorite programs of each member and run R decision tree algorithm.
+:::
+
+## Can we predict people's fav program type according to self-reported demographic info?
+
+::: {style="font-size: 0.9em;"}
+Research method:
+
+Classification Decision Tree
+
+Relevance:
+
+Wellspring manager can benefit from knowing members' program preferences by
+
+1.  recommending programs to members that they are more likely to be interested in
+
+2.  tailoring particular program types to approach certain groups of members.
+:::
+
+::: {style="font-size: 0.8em;"}
+## Model data summary
+
+-   Predictor variables:
+    -   gender
+    -   age_years
+    -   parent_of_a_child_under_18
+    -   i_identify_as_lgbtq
+    -   i_identify_as_poc
+    -   mailing_state_province
+-   Response variable:
+    -   fav_program_category - the response variable, one that I obtained by first transforming data in service table and then joining which with member background table
+:::
+
+## Processing:
+
+::: {style="font-size: 0.7em;"}
+1.  In service table, I transformed every service's name to exclude the subtitle (anything after ":" if any) so that classifying can be done to fewer session names.
+
+2.  Then, I grouped services by member_id and summarize that which session name was each one's favorite (judging by number of registration not succ attendances).
+
+-   Intermediate step with GenAI, I used Google Gemini to generate a mapping from session name to program type (I checked the classification, it made sense but might still be of questions).
+
+3.  I used the mapping to map everyone's favorite session's name to a concise category of program.
+
+4.  I join the member background table with the table of favorite program of each member and run R decision tree algorithm.
+:::
+
+## Result
+
+::: {style="font-size: 0.5em;"}
+
+:::
+
+![](decision_tree_visual.png)
+
+## Interpretation and model assessment
+::: {style="font-size: 0.5em;"}
+An accuracy of 0.6286 is achieved, which is higher than guessing the most prevalent strategy, which generates an accuracy of 0.6020.
+
+Since this classification task has no obvious unequal consequences depending on false positives/negatives, I interpret these cases equally. The tree is outperforming random guessing / guessing the most frequent option. However, it is still not quite accurate; this suggests that there are two possibilities, 1. the variables I fed are not good indicators of program type favor 2. the model is too simplistic to capture the relationship.
+:::
+
+## Data summary for research question 2
+
+::: {style="font-size: 0.57em;"}
+attendance_status:
+
+-   Focused only on members marked as "Present" (attended a program) and "Unexcused Absence" (did not attend).
+
+-   Used to identify members who successfully attended a service after registration.
+
+member_start_year & member_start_month:
+
+-   Combined to determine each member’s registration date.
+
+-   Used to split the dataset into two groups:
+
+-   Pre-March 2024 (before system change)
+
+-   Post-March 2024 (after system change)
+
+delivery_year, delivery_month, delivery_day:
+
+-   Used to build each member’s first attended service date.
+-   Calculated number of days between registration and first attendance.
+-   Kept only members whose first attendance happened within 90 days of registration (early attendees).
+:::
+
+## Testing the Impact of Registration System Change on Early Attendance
+
+::: {style="font-size: 0.8em;"}
+Is the proportion of members attending their first program within 3 months of registration higher after the system change (post-March 2024) compared to before?
+
+Method:
+
+Hypothesis Test for Two Proportions
+
+Relevance to Wellspring:
+
+-   Evaluates whether the new registration system improved early engagement.
+
+-   A more accessible system may reduce entry barriers, especially for older users.
+
+-   Findings can inform future outreach and retention strategies.
+:::
+
+## Method break down
+
+::: {style="font-size: 0.45em;"}
+A. Data Preparation:
+
+-   Filtered data to include members who attended a service (status = "Present").
+
+-   Created pre- and post- groups based on member_start_month and member_start_year, using March 2024 as the cutoff.
+
+-   Calculated the number of days between each member’s registration date and their first attended program.
+
+B. Group Classification:
+
+-   Defined “early attendance” as attending a program within 90 days (3 months) of registration.
+
+-   For each group (pre and post), calculated the proportion of members with early attendance.
+
+C. Hypothesis Testing:
+
+-   Null Hypothesis (H₀): No difference in proportions (P₁ = P₂).
+
+-   Alternative Hypothesis (H₁): Post-change proportion is greater than pre-change (P₁ \< P₂).
+
+-   Used prop.test() function in R for comparing two proportions.
+
+D. Visualization:
+
+-   Side-by-side bar chart showing % of early attendees:
+
+-   X-axis: “Before March 2024” vs. “After March 2024”
+
+-   Y-axis: Percentage of early attendance
+
+-   Title: Impact of Registration System Change on First Attendance
+:::
+
+## Result and interpretation
+
+::: {style="font-size: 0.52em;"}
+Interpretation:
+
+-   There is statistically significant evidence that more members attended early after the system update.
+
+-   The simplified system likely improved user accessibility and encouraged quicker engagement.
+
+-   Especially relevant for older populations who may have faced challenges navigating older systems.
+:::
+
+::: columns
+::: {.column width="50%"}
+```{r, echo=FALSE}
+library(dplyr)
+library(ggplot2)
+
+
+service_data <- read.csv("Service_Deliveries.csv")
+member_data <- read.csv("v3_wrangled_Member_Background.csv")
+
+#merge dataset
+data <- merge(member_data, service_data, by = "member_id")
+
+#convert data into numeric format one
+data$registration_date <- paste(data$member_start_year, ifelse(data$member_start_month < 10, paste0("0", data$member_start_month), data$member_start_month), "01", sep = "")
+data$first_attendance_date <- paste(data$delivery_year, ifelse(data$delivery_month < 10, paste0("0", data$delivery_month), data$delivery_month), ifelse(data$delivery_day < 10, paste0("0", data$delivery_day), data$delivery_day), sep = "")
+
+#let it be YYYMMMDD
+data$registration_date <- as.integer(gsub("-", "", data$registration_date))
+data$first_attendance_date <- as.integer(gsub("-", "", data$first_attendance_date))
+data$days_to_attendance <- (data$first_attendance_date %% 100) +
+  ((data$first_attendance_date %% 10000) %/% 100) * 30 +
+  ((data$first_attendance_date %/% 10000) - (data$registration_date %/% 10000)) * 365 -
+  (data$registration_date %% 100) - ((data$registration_date %% 10000) %/% 100) * 30
+
+#define what pre and post are
+data$group <- ifelse(data$registration_date < 20240301, "Pre-March 2024", "Post-March 2024")
+
+#filter for member attended within 1 month
+data$attended_within_1_month <- ifelse(data$attendance_status == "Present" & data$days_to_attendance <= 30, 1, 0)
+
+#remove na value
+data <- data %>% filter(!is.na(group) & !is.na(attended_within_1_month))
+
+#computing proportion
+prop_data <- data %>%
+  group_by(group) %>%
+  summarise(
+    attendees = sum(attended_within_1_month, na.rm = TRUE),
+    total_members = n(),
+    proportion = ifelse(total_members > 0, attendees / total_members, 0),
+    .groups = 'drop'
+  )
+
+#make sure no na values
+prop_data$proportion[is.na(prop_data$proportion)] <- 0
+
+#observed difference
+if (nrow(prop_data) == 2) {
+  obs_diff <- prop_data$proportion[2] - prop_data$proportion[1]
+} else {
+  obs_diff <- NA
+}
+
+#permutation test
+set.seed(3420)
+n_sim <- 1000
+diff_sim <- numeric(n_sim)
+for (i in 1:n_sim) {
+  shuffled_group <- sample(data$group)
+  sim_data <- data
+  sim_data$group <- shuffled_group
+  sim_props <- sim_data %>%
+    group_by(group) %>%
+    summarise(prop = sum(attended_within_1_month) / n(), .groups = 'drop')
+  if (nrow(sim_props) == 2) {
+    diff_sim[i] <- diff(sim_props$prop)
+  } else {
+    diff_sim[i] <- NA
+  }
+}
+
+diff_sim <- diff_sim[!is.na(diff_sim)] # Remove NA values
+
+#compute p-value
+p_value <- if (!is.na(obs_diff)) mean(diff_sim >= obs_diff, na.rm = TRUE) else NA
+
+#visualization the proportion we observed
+ggplot(prop_data, aes(x = group, y = proportion, fill = group)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(
+    title = "Impact of Registration System Change on First Attendance",
+    x = "Registration Period",
+    y = "Proportion Attending Within 1 Month"
+  ) +
+  theme_minimal()
+
+#visualization the sampling distribution
+ggplot(data.frame(diff_sim), aes(x = diff_sim)) +
+  geom_histogram(bins = 50, fill = "gray", color = "black") +
+  geom_vline(xintercept = obs_diff, color = "red", linetype = "dashed") +
+  labs(
+    title = "Sampling Distribution Under Null Hypothesis",
+    x = "Simulated Differences in Proportions",
+    y = "Frequency"
+  ) +
+  theme_minimal()
+
+#print
+print(paste("Observed Difference in Proportions:", obs_diff))
+print(paste("P-value:", p_value))
+
+#conclusion part
+if (!is.na(p_value) && p_value < 0.05) {
+  print("Reject the null hypothesis: The proportion of members attending within 1 month increased after the system change.")
+} else {
+  print("Fail to reject the null hypothesis: No significant evidence of an increase in attendance within 1 month.")
+}
+```
+:::
+
+::: {.column width="50%"}
+```{r, echo=FALSE}
+#visualization the sampling distribution
+ggplot(data.frame(diff_sim), aes(x = diff_sim)) +
+  geom_histogram(bins = 50, fill = "gray", color = "black") +
+  geom_vline(xintercept = obs_diff, color = "red", linetype = "dashed") +
+  labs(
+    title = "Sampling Distribution Under Null Hypothesis",
+    x = "Simulated Differences in Proportions",
+    y = "Frequency"
+  ) +
+  theme_minimal()
+```
+:::
+:::
+
+## Data summary for research question 3
+
+::: {style="font-size: 1.0em;"}
+age: age of a member.
+
+last_service_date_year: Year in which the member last attended a service.
+
+last_service_date_month: Month in which the member last attended a service.
+
+Use filter to include only members who’s last_service_year (and month) is within the past 12 months.
+:::
+
+## Estimating Median Age of Active Members Using Bootstrapping
+
+::: {style="font-size: 0.8em;"}
+What is the estimated range of the median age for currently active members (attended a service within the last 12 months)?
+
+Method:
+
+Bootstrap Confidence Interval
+
+Relevence:
+
+1.  Identify core patient groups in Wellspring’s current active users, helping better meet their demand and needs.
+2.  Adjust and specialize services provided to the target age group.
+:::
+
+## Method break down
+
+::: {style="font-size: 0.75em;"}
+A. Data Preparation:
+
+-   Filtered dataset for members who are active in recent 12 months(month and year variable).
+-   Selected variable age_year and remove any missing values (NA).
+
+B. Bootstrapping Process:
+
+1.  Loop over and resampled the sample data 500 times (sampling with replacement = TRUE).
+2.  Computed the median age for each sample.
+3.  Constructed a 95% Confidence Interval based on the distribution of bootstrap medians.
+
+C. Visualize boot strap distribution by histogram
+:::
+
+## Result and interpretation
+
+::: {style="font-size: 0.70em;"}
+Interpretation:
+
+-   The true median age of active members likely falls within this range \[56, 58\].
+-   Indicates a predominantly older demographic among active members in Wellspring users.
+
+Graph of distribution:
+
+```{r, echo=FALSE}
+#setup
+library(tidyverse)
+rdata <- read_csv("v3_wrangled_Member_Background.csv")
+
+#dataset
+bdata <- rdata|> filter(last_service_date_year %in% c(2024, 2025), last_service_date_month >= 3) |> select(age_years, last_service_date_year)|> drop_na(age_years)
+
+#set up bootstrapping for median age
+boot_sample_size <- nrow(bdata)
+num_boot <- 500
+
+set.seed(0)
+#bootloop
+test_stat <- rep(0, num_boot)
+for(j in 1: num_boot){
+  boot_sample <- bdata |>
+    slice_sample(n=boot_sample_size, replace = TRUE)
+  test_stat[j] <- median(boot_sample$age_years)
+}
+
+lower_bound <- quantile(test_stat, 0.025, names = FALSE)
+upper_bound <- quantile(test_stat, 0.975, names = FALSE)
+median_age <- median(test_stat)
+#test_stat_tibble
+test_stat_df <- tibble(sample=1:num_boot,
+       test_stat=test_stat) 
+summary_df <- test_stat_df |>  
+  summarise(lower = lower_bound, 
+            median_age = median_age,
+            upper = upper_bound)
+
+#distribution of bootsamples
+median_graph <- test_stat_df |>
+  ggplot(aes(x = test_stat)) +
+  geom_histogram(color = "darkgreen", fill = "lightgreen", binwidth = 1) +
+  geom_vline(xintercept = median_age, color = "red", linetype = "dashed") +
+  geom_vline(xintercept = lower_bound, color = "black", size = 1, linetype = "dashed") +
+  geom_vline(xintercept = upper_bound, color = "black", size = 1, linetype = "dashed") +
+  annotate("rect", xmin = lower_bound, xmax = upper_bound, ymin = 0, ymax = 500, 
+           fill = "lightblue", alpha = 0.25) +
+  annotate("text", x = median_age, y = 110, label = "95% Confidence Interval", color = "blue") +
+  labs(x = "Patient's Age (years)", y = "Count", title = "counts of patients' median age") +
+  theme_bw()
+median_graph
+```
+:::
+
+## Limitations
+
+::: {style="font-size: 0.8em;"}
+-   A large proportion of member background demographic info is missing. For example, less than 100 marital_status were populated in the dataset of 4800 observations.
+
+-   Limited access to full longitudinal data: We only examined members’ first 3 months post-registration, which may miss delayed engagement or long-term patterns.
+
+-   Lack of detailed demographic information: More nuanced variables such as socioeconomic status, digital literacy, or transportation access would help explain patterns in age-related service use or attendance timing.
+
+-   No control over external factors: Variables like seasonal trends, specific programming changes, or public health conditions (e.g., COVID-19 surges) are not accounted for but may impact attendance and usage rates.
+:::
+
+## Overall Conclusions
+
+::: {style="font-size: 0.8em;"}
+Research Question 1:
+Can we predict people's fav program type according to self-reported demographic info?
+
+Wellspring manager can benefit from knowing members' program preferences by recommending programs to members that they are more likely to be interested in and tailoring particular program types to approach certain groups of members.
+
+The tree is outperforming random guessing / guessing the most frequent option. However, it is still not quite accurate; this suggests that there are at least three areas on which we can improve: 1. the variables I fed are not good indicators of program type favor 2. the model is too simplematic to capture the relationship 3. These demographic variables have a lot of missing values, which make it hard to apply to the population.
+
+:::
+
+## Overall Conclusions
+
+::: {style="font-size: 0.8em;"}
+Research Question 2:
+
+Did the registration system change improve early attendance?
+
+Using a permutation-based hypothesis test for two proportions, we found statistically significant evidence that members who registered after the March 2024 system change were more likely to attend a service within 1 month. This supports the conclusion that the new system improved user accessibility and reduced barriers for engagement.
+:::
+
+## Overall Conclusions
+
+::: {style="font-size: 0.8em;"}
+Research Question 3:
+
+Estimating Median Age of Active Members Using Bootstrapping
+
+-   The true median age of active members likely falls within \[56, 58\]. In statistical terms, we are 95% confident that this interval captures the true median.
+
+-   Indicates a predominantly older demographic among active members in Wellspring users.
+
+-   Thus, Wellspring might want to adjust its service to accommodate the needs of elder / mid-aging groups, in order to provide better treatment for the majority of their patients.
+:::

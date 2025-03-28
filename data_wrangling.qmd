@@ -27,8 +27,7 @@ services <- read_csv("Service_Deliveries.csv")
 members_with_record_service <- (services |> group_by(member_id) |> summarise())$member_id
 member_background <- read_csv("wrangled_Member_Backgournd.csv")
 member_background |> filter(is.na(number_of_present_service_deliveries))
-na_present_deliveries <- member_background |> filter(is.na(number_of_present_service_deliveries))
-na_present_deliveries <- member_background |> filter(is.na(number_of_present_service_deliveries))
+na_present_deliveries <- member_background |> filter(is.na(number_of_present_service_deliveries) | is.na(number_of_absent_service_deliveries))
 na_present_deliveries_people <- na_present_deliveries$member_id
 
 check_alignment <- function() {
@@ -41,16 +40,99 @@ check_alignment <- function() {
 }
 
 if(check_alignment()){
-  print("all people who have na present delivery are not in service table")
+  print("all people who have na delivery info in member bg table are not in service table")
 }
 
 
-data <- data |> replace_na(list(number_of_present_service_deliveries=0))
+data <- data |> 
+  replace_na(list(number_of_present_service_deliveries=0)) |>
+  replace_na(list(number_of_absent_service_deliveries=0)) |>
+  mutate(i_identify_as_lgbtq = replace_na(as.character(i_identify_as_lgbtq), "Unknown")) |>
+  mutate(i_identify_as_poc = replace_na(as.character(i_identify_as_poc), "Unknown")) |>
+  replace_na(list(marital_status="Unknown")) |>
+  replace_na(list(how_have_you_heard_of_wellspring="Unknown")) |>
+  replace_na(list(gender="Unknown")) |>
+  replace_na(list(i_have_the_following_impairment="Unknown")) |>
+  replace_na(list(parent_of_a_child_under_18="Unknown")) |>
+  replace_na(list(program_language_preference="Unknown")) |>
+  replace_na(list(program_interest="Unknown")) |>
+  replace_na(list(types_of_cancer="Unknown"))
+
 
 
 ```
 
 ```{r}
+# encode multiselect variables
+## Parse members data
+## Types of cancer - convert to set of indicator variables for different types of cancer (don't include ones which are too rare)
+data_patient_members <- data
+data_patient_members <- data_patient_members |>
+   mutate(lung = str_detect(types_of_cancer, "Lung"),
+         breast = str_detect(types_of_cancer, "Breast"),
+         brain = str_detect(types_of_cancer, "Brain"),
+         leukemia = str_detect(types_of_cancer, "Leukemia"),
+         prostate = str_detect(types_of_cancer, "Prostate"),
+         colorectal = str_detect(types_of_cancer, "Colorectal"),
+         pancreatic = str_detect(types_of_cancer, "Pancreatic"),
+         lymphoma_non_hodgkins = str_detect(types_of_cancer, "Lymphoma, Non-hodgkins"),
+         liver = str_detect(types_of_cancer, "Liver"),
+         multiple_myeloma = str_detect(types_of_cancer, "Multiple Myeloma"),
+         bladder = str_detect(types_of_cancer, "Bladder"),
+         cervical = str_detect(types_of_cancer, "Cervical"),
+         esophagus = str_detect(types_of_cancer, "Esophagus"),
+         gallbladder_and_bile_duct = str_detect(types_of_cancer, "Gallbladder and Bile Duct"),
+         head_and_neck = str_detect(types_of_cancer, "Head and Neck"),
+         kidney = str_detect(types_of_cancer, "Kidney"),
+         lymphoma_hodgkins = str_detect(types_of_cancer, "Lymphoma, Hodgkins"),
+         ovarian = str_detect(types_of_cancer, "Ovarian"),
+         skin = str_detect(types_of_cancer, "Skin"),
+         stomach = str_detect(types_of_cancer, "Stomach"),
+         testicular = str_detect(types_of_cancer, "Testicular"),
+         thyroid = str_detect(types_of_cancer, "Thyroid"),
+         cervical = str_detect(types_of_cancer, "Cervical"),
+         other = str_detect(types_of_cancer, "Other"))
+
+
+## Impairments - convert to set of indicator variables for different types of impairment (don't include ones which are too rare)
+data_patient_members <- data_patient_members |>
+  mutate(visual = str_detect(i_have_the_following_impairment, "visual"),
+         cognitive = str_detect(i_have_the_following_impairment, "cognitive"),
+         limited_mobility = str_detect(i_have_the_following_impairment, "mobility"),
+         none_of_the_above = str_detect(i_have_the_following_impairment, "None of the above"),
+         other = str_detect(i_have_the_following_impairment, "other"),
+         speech = str_detect(i_have_the_following_impairment, "speech"),
+         hearing = str_detect(i_have_the_following_impairment, "hearing")) 
+
+## Program interests: Split into boolean indicators for different categories
+data_patient_members <- data_patient_members |>
+  mutate(therapeutic_arts = str_detect(program_interest, "Therapeutic Arts"),
+         educational_and_self_developoment = str_detect(program_interest, "Educational & Self-Development"),
+         symptom_management = str_detect(program_interest, "Symptom Management"),
+         social_events = str_detect(program_interest, "Social / Events"),
+         financiaL_and_workplace_strategies = str_detect(program_interest, "Financial & Workplace Strategies"),
+         exercise_and_movement = str_detect(program_interest, "Exercise & Movement"),
+         individual_and_group_support = str_detect(program_interest, "Individual & Group Support")) |>
+  mutate(num_program_interests = therapeutic_arts + educational_and_self_developoment + symptom_management + social_events + financiaL_and_workplace_strategies + exercise_and_movement + individual_and_group_support)
+
+## How did you hear about wellspring: Split into booleans
+data_patient_members <- data_patient_members |>
+  mutate(word_of_mouth = str_detect(how_have_you_heard_of_wellspring, "Word of mouth"),
+         flyer = str_detect(how_have_you_heard_of_wellspring, "flyer"),
+         wellspring_member = str_detect(how_have_you_heard_of_wellspring, "Member"),
+         wellspring_member = str_detect(how_have_you_heard_of_wellspring, "Volunteer"),
+         doctor = str_detect(how_have_you_heard_of_wellspring, "Doctor"),
+         hospital = str_detect(how_have_you_heard_of_wellspring, "hospital"),
+         hospital = str_detect(how_have_you_heard_of_wellspring, "healthcare"),
+         tv = str_detect(how_have_you_heard_of_wellspring, "television"),
+         website = str_detect(how_have_you_heard_of_wellspring, "Website"),
+         family = str_detect(how_have_you_heard_of_wellspring, "Family"),
+         social_media = str_detect(how_have_you_heard_of_wellspring, "Social Media"),
+         other = str_detect(how_have_you_heard_of_wellspring, "Other"))
+data <- data_patient_members
+```
+
+```{r}
 # export to new data set
-data |> write_csv("v1_wrangled_Member_Background.csv")
+data |> write_csv("v4_wrangled_Member_Background.csv")
 ```

@@ -1,0 +1,50 @@
+---
+title: "Wellspring Data Analysis Project Proposal"
+author: "Jingtian Hu - (Instructors: Nathalie Moon and Morris Greenberg)"
+format: pdf
+editor: visual
+---model <- rpart(activeness ~ age_years + gender + program_interest + mailing_city + parent_of_a_child_under_18 + types_of_cancer + i_have_the_following_impairment + how_have_you_heard_of_wellspring, data=added_frequency_category)
+---
+
+```{r}
+library(tidyverse)
+library(clock)
+library(rpart)
+library(partykit)
+setwd("~/sta130_project/")
+data <- read_csv("v3_wrangled_Member_Background.csv")
+```
+
+```{r}
+added_dates_data <- data |>
+     mutate(
+         starting_date = date_build(member_start_year, member_start_month, ),
+         ending_date = date_build(2025, 2, 1),
+     )
+
+added_membership_duration <- added_dates_data |>
+  mutate(mem_duration_month = (ending_date - starting_date) |> as.numeric() / 30)
+
+added_attendance_rate <- added_membership_duration |> 
+  filter(number_of_present_service_deliveries + number_of_absent_service_deliveries > 0) |>
+  mutate(attendance_rate = number_of_present_service_deliveries / (number_of_present_service_deliveries + number_of_absent_service_deliveries))
+
+print(median(added_attendance_rate$attendance_rate))
+print(mean(added_attendance_rate$attendance_rate))
+```
+
+```{r}
+added_attendance_rate |> ggplot(aes(x=age_years, y=attendance_rate, color = gender)) + geom_point() + labs(x="ages in years", y="attendance_rate")
+```
+
+
+```{r}
+# traning without crossvalidate
+model <- lm(attendance_rate ~ age_years * gender * i_identify_as_lgbtq * parent_of_a_child_under_18 * i_identify_as_poc * i_have_the_following_impairment * how_have_you_heard_of_wellspring * types_of_cancer + program_interest + program_language_preference, data=added_attendance_rate)
+summary(model)
+```
+
+```{r}
+# traning with crossvalidate
+model <- rpart(present_service_deliveries_per_month ~ (age_years + gender + types_of_cancer), data=final_data)
+```
